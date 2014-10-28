@@ -10,7 +10,7 @@ from dateutil.relativedelta import relativedelta
 from openlabs_report_webkit import ReportWebkit
 
 from trytond.pool import Pool
-from trytond.model import ModelView, fields
+from trytond.model import ModelView, fields, ModelSQL, ModelSingleton
 from trytond.wizard import Wizard, StateAction, StateView, Button
 from trytond.transaction import Transaction
 
@@ -52,39 +52,44 @@ class CEOReport(ReportWebkit):
         Inventory = Pool().get('stock.inventory')
         Production = Pool().get('production')
 
-        days = 1
+        days = data['days']
 
-        # Can be used for generating report for multiple days
-        if data.get('days'):
-            days = data['days']
-
-        sales = Sale.search([
-            ('state', 'in', ['confirmed', 'processing', 'done']),
-            ('write_date', '>=', (datetime.today() - relativedelta(days=days))),
-        ])
-        shipments = ShipmentOut.search([
-            ('state', 'in', ['done', 'packed', 'assigned', 'waiting']),
-            ('write_date', '>=', (datetime.today() - relativedelta(days=days))),
-        ])
-        productions = Production.search([
-            ('state', 'in', ['done', 'running', 'assigned', 'waiting']),
-            ('write_date', '>=', (datetime.today() - relativedelta(days=days))),
-        ])
-        inventories = Inventory.search([
-            ('date', '>=', (date.today() - relativedelta(days=days))),
-        ])
-        done_shipments_today = ShipmentOut.search([
-            ('effective_date', '>=', (date.today() - relativedelta(days=days))),
-            ('state', '=', 'done'),
-        ], count=True)
-
-        localcontext.update({
-            'sales': sales,
-            'shipments': shipments,
-            'productions': productions,
-            'inventories': inventories,
-            'done_shipments_today': done_shipments_today,
-        })
+        if data['sales']:
+            sales = Sale.search([
+                ('state', 'in', ['confirmed', 'processing', 'done']),
+                ('write_date', '>=', (datetime.today() - relativedelta(days=days))),
+            ])
+            localcontext.update({
+                'sales': sales,
+            })
+        if data['shipments']:
+            shipments = ShipmentOut.search([
+                ('state', 'in', ['done', 'packed', 'assigned', 'waiting']),
+                ('write_date', '>=', (datetime.today() - relativedelta(days=days))),
+            ])
+            done_shipments_today = ShipmentOut.search([
+                ('effective_date', '>=', (date.today() - relativedelta(days=days))),
+                ('state', '=', 'done'),
+            ], count=True)
+            localcontext.update({
+                'shipments': shipments,
+                'done_shipments_today': done_shipments_today,
+            })
+        if data['productions']:
+            productions = Production.search([
+                ('state', 'in', ['done', 'running', 'assigned', 'waiting']),
+                ('write_date', '>=', (datetime.today() - relativedelta(days=days))),
+            ])
+            localcontext.update({
+                'productions': productions,
+            })
+        if data['inventories']:
+            inventories = Inventory.search([
+                ('date', '>=', (date.today() - relativedelta(days=days))),
+            ])
+            localcontext.update({
+                'inventories': inventories,
+            })
         return super(CEOReport, cls).parse(
             report, records, data, localcontext
         )
@@ -95,6 +100,50 @@ class GenerateCEOReportStart(ModelView):
     __name__ = 'ceo.report.generate.start'
 
     days = fields.Integer('No. of Days')
+    sales = fields.Boolean('Sales')
+    shipments = fields.Boolean('Shipments')
+    productions = fields.Boolean('Productions')
+    inventories = fields.Boolean('Inventories')
+
+    @staticmethod
+    def default_days():
+        """
+        Set default number of days as the days set in congifuration
+        """
+        CEOReportConfig = Pool().get('ceo.report.configuration')
+        return CEOReportConfig(1).days
+
+    @staticmethod
+    def default_sales():
+        """
+        Set default from configuration
+        """
+        CEOReportConfig = Pool().get('ceo.report.configuration')
+        return CEOReportConfig(1).sales
+
+    @staticmethod
+    def default_shipments():
+        """
+        Set default from configuration
+        """
+        CEOReportConfig = Pool().get('ceo.report.configuration')
+        return CEOReportConfig(1).shipments
+
+    @staticmethod
+    def default_productions():
+        """
+        Set default from configuration
+        """
+        CEOReportConfig = Pool().get('ceo.report.configuration')
+        return CEOReportConfig(1).productions
+
+    @staticmethod
+    def default_inventories():
+        """
+        Set default from configuration
+        """
+        CEOReportConfig = Pool().get('ceo.report.configuration')
+        return CEOReportConfig(1).inventories
 
 
 class GenerateCEOReport(Wizard):
@@ -116,8 +165,48 @@ class GenerateCEOReport(Wizard):
         """
         data = {
             'days': self.start.days or 1,
+            'sales': self.start.sales,
+            'shipments': self.start.shipments,
+            'inventories': self.start.inventories,
+            'productions': self.start.productions,
         }
         return action, data
 
     def transition_generate(self):
         return 'end'
+
+
+class CEOReportConfiguration(ModelSingleton, ModelSQL, ModelView):
+    """
+    CEO Report Configuration
+    """
+    __name__ = 'ceo.report.configuration'
+
+    sales = fields.Boolean('Sales')
+    shipments = fields.Boolean('Shipments')
+    productions = fields.Boolean('Productions')
+    inventories = fields.Boolean('Inventories')
+    days = fields.Integer('No. of Days')
+
+    @staticmethod
+    def default_days():
+        """
+        Set default number of days as 1
+        """
+        return 1
+
+    @staticmethod
+    def default_sales():
+        return True
+
+    @staticmethod
+    def default_shipments():
+        return True
+
+    @staticmethod
+    def default_productions():
+        return True
+
+    @staticmethod
+    def default_inventories():
+        return True

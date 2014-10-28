@@ -65,14 +65,15 @@
                     <div class="h2">Number of Shipments:</div>
                 </div>
                 <div class="col-xs-2">
-                    <div class="h2">{{ sales|length() }}</div>
-                    <div class="h2">{{ done_shipments_today }}</div>
+                    <div class="h2">{% if data['sales'] %} {{ sales|length() }} {% else %} N/A {% endif %}</div>
+                    <div class="h2">{% if data['shipments'] %} {{ done_shipments_today }} {% else %} N/A {% endif %}</div>
                 </div>
             </div>
             <div class="row" style="height:800px;">
                 {# Note: Placeholder for pie chart and other front-page content
                 #}
             </div>
+            {% if data['sales'] %}
             <div class="row">
                 <div class="col-xs-12">
                     <span class="h3">Sales</span>
@@ -104,6 +105,8 @@
                     {% endif %}
                 </div>
             </div>
+            {% endif %}
+            {% if data['shipments'] %}
             <div class="row">
                 <div class="col-xs-12">
                     <hr />
@@ -136,6 +139,8 @@
                     {% endif %}
                 </div>
             </div>
+            {% endif %}
+            {% if data['inventories'] %}
             <div class="row">
                 <div class="col-xs-12">
                     <hr />
@@ -172,6 +177,8 @@
                     {% endif %}
                 </div>
             </div>
+            {% endif %}
+            {% if data['productions'] %}
             <div class="row">
                 <div class="col-xs-12">
                     <hr />
@@ -214,6 +221,7 @@
                     {% endif %}
                 </div>
             </div>
+            {% endif %}
         </div>
     {% endblock %}
   </body>

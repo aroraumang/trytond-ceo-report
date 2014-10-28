@@ -16,9 +16,31 @@
             <field name="name">CEO Report</field>
             <field name="wiz_name">ceo.report.generate</field>
         </record>
-        <menuitem parent="ir.menu_administration"
+        <menuitem name="CEO Report" parent="ir.menu_administration" id="menu_ceo_report"/>
+        <menuitem parent="menu_ceo_report"
             action="wizard_generate_ceo_report"
             id="menu_generate_ceo_report" icon="tryton-spreadsheet"
             sequence="100"/>
+        <record model="ir.ui.view" id="ceo_report_configuration_view_form">
+            <field name="model">ceo.report.configuration</field>
+            <field name="type">form</field>
+            <field name="name">ceo_report_configuration_form</field>
+        </record>
+        <record model="ir.action.act_window"
+            id="act_ceo_report_configuration_form">
+            <field name="name">Configuration</field>
+            <field name="res_model">ceo.report.configuration</field>
+            <field name="context"></field>
+        </record>
+        <record model="ir.action.act_window.view"
+            id="act_ceo_report_configuration_form_view1">
+            <field name="sequence" eval="1"/>
+            <field name="view" ref="ceo_report_configuration_view_form"/>
+            <field name="act_window" ref="act_ceo_report_configuration_form"/>
+        </record>
+        <menuitem parent="menu_ceo_report"
+            action="act_ceo_report_configuration_form"
+            id="menu_ceo_report_configuration" icon="tryton-preferences"
+            sequence="90"/>
     </data>
 </tryton>
