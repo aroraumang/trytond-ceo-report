@@ -13,6 +13,10 @@ from trytond.pool import Pool
 from trytond.model import ModelView, fields, ModelSQL, ModelSingleton
 from trytond.wizard import Wizard, StateAction, StateView, Button
 from trytond.transaction import Transaction
+from trytond.config import CONFIG
+
+from jinja2 import Environment, PackageLoader
+from nereid import render_email
 
 __all__ = ['CEOReport', 'GenerateCEOReport', 'GenerateCEOReportStart']
 
@@ -57,7 +61,11 @@ class CEOReport(ReportWebkit):
         if data['sales']:
             sales = Sale.search([
                 ('state', 'in', ['confirmed', 'processing', 'done']),
-                ('write_date', '>=', (datetime.today() - relativedelta(days=days))),
+                (
+                    'write_date',
+                    '>=',
+                    (datetime.today() - relativedelta(days=days))
+                ),
             ])
             localcontext.update({
                 'sales': sales,
@@ -65,10 +73,18 @@ class CEOReport(ReportWebkit):
         if data['shipments']:
             shipments = ShipmentOut.search([
                 ('state', 'in', ['done', 'packed', 'assigned', 'waiting']),
-                ('write_date', '>=', (datetime.today() - relativedelta(days=days))),
+                (
+                    'write_date',
+                    '>=',
+                    (datetime.today() - relativedelta(days=days))
+                ),
             ])
             done_shipments_today = ShipmentOut.search([
-                ('effective_date', '>=', (date.today() - relativedelta(days=days))),
+                (
+                    'effective_date',
+                    '>=',
+                    (date.today() - relativedelta(days=days))
+                ),
                 ('state', '=', 'done'),
             ], count=True)
             localcontext.update({
@@ -78,7 +94,11 @@ class CEOReport(ReportWebkit):
         if data['productions']:
             productions = Production.search([
                 ('state', 'in', ['done', 'running', 'assigned', 'waiting']),
-                ('write_date', '>=', (datetime.today() - relativedelta(days=days))),
+                (
+                    'write_date',
+                    '>=',
+                    (datetime.today() - relativedelta(days=days))
+                ),
             ])
             localcontext.update({
                 'productions': productions,
@@ -210,3 +230,49 @@ class CEOReportConfiguration(ModelSingleton, ModelSQL, ModelView):
     @staticmethod
     def default_inventories():
         return True
+
+    @classmethod
+    def send_email(cls):
+        """
+        Runs everyday through Cron to send daily report
+        """
+        EmailQueue = Pool().get('email.queue')
+        ModelData = Pool().get('ir.model.data')
+        Group = Pool().get('res.group')
+        CEOReport = Pool().get('ceo.report', type='report')
+        CEOReportConfig = Pool().get('ceo.report.configuration')
+
+        group_id = ModelData.get_id(
+            "ceo_report", "ceo_report_receivers"
+        )
+        to_emails = map(
+            lambda user: user.email,
+            filter(lambda user: user.email, Group(group_id).users)
+        )
+
+        env = Environment(loader=PackageLoader(
+            'trytond.modules.ceo_report', 'emails'
+        ))
+
+        report_config = CEOReportConfig(1)
+
+        val = CEOReport.execute([], {
+            'days': report_config.days,
+            'sales': report_config.sales,
+            'shipments': report_config.shipments,
+            'inventories': report_config.inventories,
+            'productions': report_config.productions,
+        })
+
+        if to_emails:
+            email_message = render_email(
+                CONFIG['smtp_from'], to_emails, 'Daily Report',
+                text_template=env.get_template('ceo_report_text.html'),
+                html_template=env.get_template('ceo_report_html.html'),
+                attachments={"%s.%s" % (val[3], val[0]): val[1]},
+                formatLang=lambda *args, **kargs: CEOReport.format_lang(
+                    *args, **kargs)
+            )
+            EmailQueue.queue_mail(
+                CONFIG['smtp_from'], to_emails, email_message.as_string()
+            )

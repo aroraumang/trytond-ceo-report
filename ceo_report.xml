@@ -42,5 +42,21 @@
             action="act_ceo_report_configuration_form"
             id="menu_ceo_report_configuration" icon="tryton-preferences"
             sequence="90"/>
+
+        <record id="ceo_report_receivers" model="res.group">
+            <field name="name">CEO Report receivers</field>
+        </record>
+        <record model="ir.cron" id="cron_ceo_report">
+            <field name="name">CEO Report Email Cron</field>
+            <field name="request_user" ref="res.user_admin"/>
+            <field name="user" ref="res.user_trigger"/>
+            <field name="active" eval="True"/>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="number_calls">-1</field>
+            <field name="repeat_missed" eval="False"/>
+            <field name="model">ceo.report.configuration</field>
+            <field name="function">send_email</field>
+        </record>
     </data>
 </tryton>
