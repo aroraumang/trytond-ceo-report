@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <meta charset="utf-8">
+    <meta http-equiv="Content-type" content="text/html; charset=utf-8">
     <title>{% block title %}CEO Report{% endblock %}</title>
     <meta name="description" content="">
     <meta name="author" content="Openlabs Technologies & Consulting (P) Ltd.">
@@ -9,7 +9,53 @@
     <!-- Latest compiled and minified CSS -->
     <link rel="stylesheet" href="http://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css">
     <link rel="stylesheet" href="http://maxcdn.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css">
-    <link href='http://fonts.googleapis.com/css?family=Lora' rel='stylesheet' type='text/css'>
+    <script type="text/javascript" src="https://www.google.com/jsapi"></script>
+    {% if data['sales'] and sales_for_chart %}
+        <script type="text/javascript">
+          google.load("visualization", "1", {packages:["corechart"]});
+          google.setOnLoadCallback(drawChart);
+          function drawChart() {
+              var chart_header = [['Date', '# of Sales', { role: 'annotation' }]]
+              var sales_for_chart = chart_header.concat({{ sales_for_chart }});
+            var data = google.visualization.arrayToDataTable(sales_for_chart);
+
+            var options = {
+              title: 'Sales',
+              width: 1100,
+              height: 860,
+              hAxis: {title: 'Days',  titleTextStyle: {color: 'red'}}
+            };
+
+            var chart = new google.visualization.BarChart(document.getElementById('sales_bar_chart'));
+
+            chart.draw(data, options);
+          }
+        </script>
+      {% if data['shipments'] %}
+        <script type="text/javascript">
+          google.load("visualization", "1", {packages:["corechart"]});
+          google.setOnLoadCallback(drawChart);
+          function drawChart() {
+
+            var data = google.visualization.arrayToDataTable([
+              ['Type', 'Number'],
+              ['Shipments', {{ done_shipments }}],
+              ['Sales', {{ sales|length() }}]
+            ]);
+
+            var options = {
+              width: 500,
+              height: 500,
+              title: 'Sales vs Shipments'
+            };
+
+            var chart = new google.visualization.PieChart(document.getElementById('piechart'));
+
+            chart.draw(data, options);
+          }
+        </script>
+      {% endif %}
+    {% endif %}
     <style type="text/css">
       .page-break {
         padding-top: 10px;
@@ -24,9 +70,10 @@
       .h2 {
         font-size: 16px;
       }
-      body {
-        font-family: 'Lora', serif;
-        font-size: 10px;
+      .div-font {
+          font-family: 'Lora', serif;
+          font-size: 14px;
+          line-height: 1.42857143;
       }
     </style>
   </head>
@@ -66,20 +113,31 @@
                 </div>
                 <div class="col-xs-2">
                     <div class="h2">{% if data['sales'] %} {{ sales|length() }} {% else %} N/A {% endif %}</div>
-                    <div class="h2">{% if data['shipments'] %} {{ done_shipments_today }} {% else %} N/A {% endif %}</div>
+                    <div class="h2">{% if data['shipments'] %} {{ done_shipments }} {% else %} N/A {% endif %}</div>
                 </div>
             </div>
-            <div class="row" style="height:800px;">
-                {# Note: Placeholder for pie chart and other front-page content
-                #}
-            </div>
+            {% if data['sales'] and data['shipments'] %}
+                <div class="row">
+                    <div class="col-xs-9 col-xs-offset-3" style="padding-top:35px;">
+                        <div id="piechart"></div>
+                    </div>
+                </div>
+            {% endif %}
+            {% if data['sales'] and sales_for_chart %}
+                <div class="row" style="height:860px;">
+                    <div id="sales_bar_chart"></div>
+                </div>
+            {% else %}
+                <div class="row" style="height:800px;">
+                </div>
+            {% endif %}
             {% if data['sales'] %}
-            <div class="row">
+            <div class="row div-font">
                 <div class="col-xs-12">
                     <span class="h3">Sales</span>
                 </div>
             </div>
-            <div class="row">
+            <div class="row div-font">
                 <div class="col-xs-12">
                     {% if sales %}
                         <table class="table">
@@ -102,18 +160,21 @@
                                 {% endfor %}
                             </tbody>
                         </table>
+                        <hr />
+                    {% else %}
+                        <div class="alert alert-warning" role="alert">No Sales found!</div>
+                        <hr />
                     {% endif %}
                 </div>
             </div>
             {% endif %}
             {% if data['shipments'] %}
-            <div class="row">
+            <div class="row div-font">
                 <div class="col-xs-12">
-                    <hr />
                     <span class="h3">Shipments</span>
                 </div>
             </div>
-            <div class="row">
+            <div class="row div-font">
                 <div class="col-xs-12">
                     {% if shipments %}
                         <table class="table">
@@ -136,18 +197,21 @@
                                 {% endfor %}
                             </tbody>
                         </table>
+                        <hr />
+                    {% else %}
+                        <div class="alert alert-warning" role="alert">No Shipments found!</div>
+                        <hr />
                     {% endif %}
                 </div>
             </div>
             {% endif %}
             {% if data['inventories'] %}
-            <div class="row">
+            <div class="row div-font">
                 <div class="col-xs-12">
-                    <hr />
                     <span class="h3">Inventories</span>
                 </div>
             </div>
-            <div class="row">
+            <div class="row div-font">
                 <div class="col-xs-12">
                     {% if inventories %}
                         <table class="table">
@@ -174,18 +238,21 @@
                                 {% endfor %}
                             </tbody>
                         </table>
+                        <hr />
+                    {% else %}
+                        <div class="alert alert-warning" role="alert">No Inventories found!</div>
+                        <hr />
                     {% endif %}
                 </div>
             </div>
             {% endif %}
             {% if data['productions'] %}
-            <div class="row">
+            <div class="row div-font">
                 <div class="col-xs-12">
-                    <hr />
                     <span class="h3">Productions</span>
                 </div>
             </div>
-            <div class="row">
+            <div class="row div-font">
                 <div class="col-xs-12">
                     {% if productions %}
                         <table class="table">
@@ -218,11 +285,16 @@
                                 {% endfor %}
                             </tbody>
                         </table>
+                        <hr />
+                    {% else %}
+                        <div class="alert alert-warning" role="alert">No Productions found!</div>
+                        <hr />
                     {% endif %}
                 </div>
             </div>
             {% endif %}
         </div>
     {% endblock %}
+    </script>
   </body>
 </html>

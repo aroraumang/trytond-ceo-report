@@ -5,6 +5,7 @@
     :copyright: (c) 2014 by Openlabs Technologies & Consulting (P) Limited
     :license: BSD, see LICENSE for more details.
 """
+from itertools import groupby
 from datetime import date, datetime
 from dateutil.relativedelta import relativedelta
 from openlabs_report_webkit import ReportWebkit
@@ -51,24 +52,36 @@ class CEOReport(ReportWebkit):
 
     @classmethod
     def parse(cls, report, records, data, localcontext):
-        Sale = Pool().get('sale.sale')
         ShipmentOut = Pool().get('stock.shipment.out')
         Inventory = Pool().get('stock.inventory')
         Production = Pool().get('production')
+        User = Pool().get('res.user')
 
         days = data['days']
 
         if data['sales']:
-            sales = Sale.search([
-                ('state', 'in', ['confirmed', 'processing', 'done']),
-                (
-                    'write_date',
-                    '>=',
-                    (datetime.today() - relativedelta(days=days))
-                ),
-            ])
+            sales = cls.get_sales_for_days(days)
+            sales_for_chart = []
+
+            if sales:
+                for key, records in groupby(sales, key=lambda s: s.sale_date):
+                    no_of_sales = len(list(records))
+                    sales_for_chart.append(
+                        [
+                            str(
+                                cls.format_lang(
+                                    key,
+                                    User(Transaction().user).language,
+                                    date=True
+                                )
+                            ),
+                            no_of_sales,
+                            no_of_sales
+                        ]
+                    )
             localcontext.update({
                 'sales': sales,
+                'sales_for_chart': sales_for_chart,
             })
         if data['shipments']:
             shipments = ShipmentOut.search([
@@ -79,7 +92,7 @@ class CEOReport(ReportWebkit):
                     (datetime.today() - relativedelta(days=days))
                 ),
             ])
-            done_shipments_today = ShipmentOut.search([
+            done_shipments = ShipmentOut.search([
                 (
                     'effective_date',
                     '>=',
@@ -89,7 +102,7 @@ class CEOReport(ReportWebkit):
             ], count=True)
             localcontext.update({
                 'shipments': shipments,
-                'done_shipments_today': done_shipments_today,
+                'done_shipments': done_shipments,
             })
         if data['productions']:
             productions = Production.search([
@@ -110,9 +123,28 @@ class CEOReport(ReportWebkit):
             localcontext.update({
                 'inventories': inventories,
             })
+
         return super(CEOReport, cls).parse(
             report, records, data, localcontext
         )
+
+    @classmethod
+    def get_sales_for_days(cls, days):
+        """
+        Returns sales for the given number of days
+        :param days: Number of days to get the sales data for
+        """
+        Sale = Pool().get('sale.sale')
+
+        sales = Sale.search([
+            ('state', 'in', ['confirmed', 'processing', 'done']),
+            (
+                'sale_date',
+                '>=',
+                (date.today() - relativedelta(days=days))
+            ),
+        ])
+        return sales
 
 
 class GenerateCEOReportStart(ModelView):
