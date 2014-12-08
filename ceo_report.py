@@ -5,9 +5,11 @@
     :copyright: (c) 2014 by Openlabs Technologies & Consulting (P) Limited
     :license: BSD, see LICENSE for more details.
 """
+import json
 from datetime import datetime, time, date
 from dateutil.relativedelta import relativedelta
 from openlabs_report_webkit import ReportWebkit
+from itertools import groupby
 
 from trytond.pool import Pool
 from trytond.model import ModelView, fields
@@ -83,10 +85,53 @@ class CEOReport(ReportWebkit):
             'productions': productions,
             'inventories': inventories,
             'done_shipments_today': done_shipments_today,
+            'sale_has_salesman': True if hasattr(Sale, 'employee') else False,
+            'sale_has_shop': True if hasattr(Sale, 'shop') else False,
+            'get_sales_by_salesman_data': cls.get_sales_by_salesman_data,
+            'get_sales_by_shop_data': cls.get_sales_by_shop_data
         })
         return super(CEOReport, cls).parse(
             report, records, data, localcontext
         )
+
+    @classmethod
+    def get_sales_by_salesman_data(cls, sales):
+        """
+        Extracts the data from sales and returns it in the form
+        understandable for the graph
+        """
+        sales_by_salesman = []
+
+        for salesman, records in groupby(
+            sorted(sales, key=lambda s: s.employee),
+            key=lambda s: s.employee
+        ):
+            sales_by_salesman.append({
+                "label": salesman and salesman.party.name or "Others",
+                "value": len(list(records))
+            })
+
+        print sales_by_salesman
+        return json.dumps(sales_by_salesman)
+
+    @classmethod
+    def get_sales_by_shop_data(cls, sales):
+        """
+        Extracts the data from sales and returns it in the form
+        understandable for the graph
+        """
+        sales_by_shop = []
+
+        for shop, records in groupby(
+            sorted(sales, key=lambda s: s.shop),
+            key=lambda s: s.shop
+        ):
+            sales_by_shop.append({
+                "label": shop and shop.name or "Others",
+                "value": len(list(records))
+            })
+
+        return json.dumps(sales_by_shop)
 
 
 class GenerateCEOReportStart(ModelView):

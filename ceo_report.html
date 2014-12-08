@@ -28,6 +28,10 @@
         font-family: 'Lora', serif;
         font-size: 10px;
       }
+      .slice text {
+        font-size: 12px;
+        font-family: 'Lora', serif;
+      }
     </style>
   </head>
   <body>
@@ -55,11 +59,11 @@
                     </div>
                 </div>
               </div>
+              <div class="col-xs-12">
+                <hr />
+              </div>
             </div>
             <div class="row">
-                <div class="col-xs-12">
-                    <hr />
-                </div>
                 <div class="col-xs-4">
                     <div class="h2">Number of Orders:</div>
                     <div class="h2">Number of Shipments:</div>
@@ -79,30 +83,22 @@
                 </div>
             </div>
             <div class="row">
+              {% if sales and sale_has_salesman %}
                 <div class="col-xs-12">
-                    {% if sales %}
-                        <table class="table">
-                            <thead>
-                                <th>Order No.</th>
-                                <th>State</th>
-                                <th>Customer Name</th>
-                                <th>Address</th>
-                                <th class="text-right">Amount</th>
-                            </thead>
-                            <tbody>
-                                {% for sale in sales %}
-                                    <tr>
-                                        <td>{{ sale.reference }}</td>
-                                        <td class="text-capitalize">{{ sale.state }}</td>
-                                        <td>{{ sale.party.name }}</td>
-                                        <td>{{ sale.shipment_address.rec_name }}</td>
-                                        <td class="text-right">{{ sale.total_amount|currencyformat(sale.currency.code) }}</td>
-                                    <tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    {% endif %}
+                    <p class="h2 text-center">Sales by Salesman</p>
                 </div>
+                <div class="col-xs-10 col-xs-offset-2">
+                  <div id="sales_by_salesman_piechart"></div>
+                </div>
+              {% endif %}
+              {% if sales and sale_has_shop %}
+                <div class="col-xs-12">
+                    <p class="h2 text-center">Sales by Shop</p>
+                </div>
+                <div class="col-xs-10 col-xs-offset-2">
+                  <div id="sales_by_shop_piechart"></div>
+                </div>
+              {% endif %}
             </div>
             <div class="row">
                 <div class="col-xs-12">
@@ -216,5 +212,81 @@
             </div>
         </div>
     {% endblock %}
+
+    {% block script_tags %}
+      <script src="http://d3js.org/d3.v3.min.js"></script>
+    {% endblock script_tags %}
+
+    {% block scripts %}
+      {% if sales and (sale_has_salesman or sale_has_shop) %}
+        <script type="text/javascript">
+          function drawPieChart(element_id, data) {
+            var w = 400,                        //width
+            h = 400,                            //height
+            r = 100,                            //radius
+            color = d3.scale.category10();     //builtin range of colors
+
+            var vis = d3.select(element_id)
+                .append("svg:svg")              //create the SVG element inside the <div>
+                .data([data])                   //associate our data with the document
+                    .attr("width", w)           //set the width and height of our visualization (these will be attributes of the <svg> tag
+                    .attr("height", h)
+                .append("svg:g")                //make a group to hold our pie chart
+                    .attr("transform", "translate(" + 2*r + "," + 2*r + ")")    //move the center of the pie chart from 0, 0 to radius, radius
+
+            var arc = d3.svg.arc()              //this will create <path> elements for us using arc data
+                .outerRadius(r);
+
+            var pie = d3.layout.pie()           //this will create arc data for us given a list of values
+                .value(function(d) { return d.value; });    //we must tell it out to access the value of each element in our data array
+
+            var arcs = vis.selectAll("g.slice")     //this selects all <g> elements with class slice (there aren't any yet)
+                .data(pie)                          //associate the generated pie data (an array of arcs, each having startAngle, endAngle and value properties) 
+                .enter()                            //this will create <g> elements for every "extra" data element that should be associated with a selection. The result is creating a <g> for every object in the data array
+                    .append("svg:g")                //create a group to hold each slice (we will have a <path> and a <text> element associated with each slice)
+                        .attr("class", "slice");    //allow us to style things in the slices (like text)
+
+                arcs.append("svg:path")
+                        .attr("fill", function(d, i) { return color(i); } ) //set the color for each slice to be chosen from the color function defined above
+                        .attr("d", arc);                                    //this creates the actual SVG path using the associated data (pie) with the arc drawing function
+
+                arcs.append("svg:text")                                     //add a label to each slice
+                        .attr("transform", function(d) {                    //set the label's origin to the center of the arc
+                        //we have to make sure to set these before calling arc.centroid
+                        d.innerRadius = r + 45;
+                        d.outerRadius = r + 50;
+                        return "translate(" + arc.centroid(d) + ")";        //this gives us a pair of coordinates like [50, 50]
+                    })
+                    .attr("text-anchor", "middle")                          //center the text on it's origin
+                    .text(function(d, i) { return data[i].label; });      //get the label from our original data array
+
+                arcs.filter(function(d) { return d.endAngle - d.startAngle > .2; }).append("svg:text")
+                  .attr("dy", ".35em")
+                  .attr("text-anchor", "middle")
+                  //.attr("transform", function(d) { return "translate(" + arc.centroid(d) + ")rotate(" + angle(d) + ")"; })
+                  .attr("transform", function(d) { //set the label's origin to the center of the arc
+                    //we have to make sure to set these before calling arc.centroid
+                    d.outerRadius = r; // Set Outer Coordinate
+                    d.innerRadius = r/2; // Set Inner Coordinate
+                    return "translate(" + arc.centroid(d) + ")rotate(" + angle(d) + ")";
+                  })
+                  .style("fill", "White")
+                  .text(function(d) { return d.data.value; });
+
+                // Computes the angle of an arc, converting from radians to degrees.
+                function angle(d) {
+                  var a = (d.startAngle + d.endAngle) * 90 / Math.PI - 90;
+                  return a > 90 ? a - 180 : a;
+                }
+          }
+          {% if sale_has_salesman %}
+            drawPieChart("#sales_by_salesman_piechart", {{ get_sales_by_salesman_data(sales) }});
+          {% endif %}
+          {% if sale_has_salesman %}
+            drawPieChart("#sales_by_shop_piechart", {{ get_sales_by_shop_data(sales) }});
+          {% endif %}
+        </script>
+      {% endif %}
+    {% endblock scripts %}
   </body>
 </html>
